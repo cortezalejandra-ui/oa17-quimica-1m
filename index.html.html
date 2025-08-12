@@ -1,0 +1,575 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>OA17 Química 1° Medio – Reacciones en la vida diaria</title>
+  <meta name="description" content="App interactiva para aprender OA17: evidencias de reacciones químicas, factores, ecuaciones y su impacto." />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    html, body { height: 100%; }
+  </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-sky-50 to-emerald-50 text-slate-800">
+  <div id="root"></div>
+
+  <!-- React 18 -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- Babel para permitir JSX en este archivo único -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    // Utilidad clases
+    const classNames = (...c) => c.filter(Boolean).join(" ");
+
+    // Persistencia simple en localStorage
+    const useLocal = (key, initial) => {
+      const [state, setState] = useState(() => {
+        try {
+          const raw = localStorage.getItem(key);
+          return raw ? JSON.parse(raw) : initial;
+        } catch {
+          return initial;
+        }
+      });
+      useEffect(() => {
+        try { localStorage.setItem(key, JSON.stringify(state)); } catch {}
+      }, [key, state]);
+      return [state, setState];
+    };
+
+    const OA17_TEXT = `Investigar experimentalmente y explicar, usando evidencias, que la fermentación, la combustión (motor, calefactor) y la oxidación de metales, entre otras, son reacciones químicas presentes en la vida diaria, considerando: (a) evidencias como producción de gas, formación de precipitados, cambios de temperatura, color y olor, y emisión de luz; (b) la influencia de cantidad de sustancia, temperatura, volumen y presión; (c) su representación simbólica en ecuaciones químicas; (d) su impacto en los seres vivos y el entorno.`;
+
+    const REACCIONES = [
+      {
+        id: "fermentacion",
+        titulo: "Fermentación (glucosa → etanol + CO₂)",
+        explicacion: "Proceso anaeróbico realizado por levaduras y bacterias que transforma azúcares en alcohol (u otros productos) y dióxido de carbono. Presente en panificación y bebidas fermentadas.",
+        ecuacion: "C6H12O6 → 2 C2H5OH + 2 CO2",
+        evidencias: ["Producción de gas (burbujas)", "Cambio de olor", "Cambio de temperatura leve"],
+        impacto: [
+          "Aplicaciones alimentarias (pan, yogurt, bebidas)",
+          "Puede liberar CO₂ (impacto climático si es a gran escala)",
+          "Riesgo de presión en envases cerrados",
+        ],
+        seguridad: [
+          "Usar recipientes ventilados o con trampa de aire",
+          "Higiene: lavar manos y utensilios",
+        ],
+      },
+      {
+        id: "combustion",
+        titulo: "Combustión (metano + O₂ → CO₂ + H₂O)",
+        explicacion: "Reacción rápida con oxígeno que libera energía (calor, luz). Ocurre en motores, calefactores y cocinas.",
+        ecuacion: "CH4 + 2 O2 → CO2 + 2 H2O",
+        evidencias: ["Emisión de luz", "Aumento de temperatura", "Formación de gases"],
+        impacto: [
+          "Emisión de CO₂ y posibles contaminantes (NOx, CO)",
+          "Riesgo de incendios si no hay control",
+          "Consume oxígeno del ambiente",
+        ],
+        seguridad: [
+          "Ventilar espacios cerrados",
+          "Mantener fuentes de ignición controladas",
+          "Detectores de CO en calefacción a combustión",
+        ],
+      },
+      {
+        id: "oxidacion",
+        titulo: "Oxidación de metales (hierro + O₂ → óxido)",
+        explicacion: "Reacción lenta en la que el metal se combina con oxígeno y agua formando óxidos (corrosión).",
+        ecuacion: "4 Fe + 3 O2 → 2 Fe2O3",
+        evidencias: ["Cambio de color (pardo rojizo)", "Cambios de textura (escamas)", "A veces liberación de calor muy leve"],
+        impacto: [
+          "Daño a estructuras y objetos (costos económicos)",
+          "Residuos sólidos (óxidos)",
+        ],
+        seguridad: [
+          "Proteger metales con pinturas o galvanizado",
+          "Evitar humedad prolongada",
+        ],
+      },
+    ];
+
+    const EVIDENCIAS_QUIZ = [
+      {
+        id: 1,
+        escenario: "Una botella con levadura, agua tibia y azúcar forma espuma y se infla un globo en la boquilla.",
+        opciones: ["Producción de gas", "Formación de precipitado", "Emisión de luz", "Cambio de temperatura"],
+        respuestasCorrectas: ["Producción de gas", "Cambio de temperatura"],
+      },
+      {
+        id: 2,
+        escenario: "En una fogata, la madera arde con llama visible y calienta el entorno.",
+        opciones: ["Emisión de luz", "Formación de precipitado", "Aumento de temperatura", "Cambio de olor"],
+        respuestasCorrectas: ["Emisión de luz", "Aumento de temperatura", "Cambio de olor"],
+      },
+      {
+        id: 3,
+        escenario: "Una llave de fierro dejada a la intemperie se pone café rojiza y se descascara.",
+        opciones: ["Cambio de color", "Producción de gas", "Formación de precipitado sólido", "Emisión de luz"],
+        respuestasCorrectas: ["Cambio de color", "Formación de precipitado sólido"],
+      },
+    ];
+
+    function rateFromConditions({ temperaturaC, moles, volumenL, presionAtm }) {
+      const concentracion = moles / Math.max(0.1, volumenL);
+      const fT = Math.exp((temperaturaC - 25) / 50);
+      const fP = Math.max(0.5, Math.min(2, presionAtm));
+      const rate = concentracion * fT * fP;
+      const norm = Math.max(0, Math.min(100, Math.round((rate / 10) * 100) / 100));
+      return Math.min(100, Math.round(norm));
+    }
+
+    const elementRegex = /([A-Z][a-z]?)((\d+)?)/g;
+    function parseFormula(formula) {
+      const map = {};
+      let match;
+      while ((match = elementRegex.exec(formula))) {
+        const el = match[1];
+        const count = parseInt(match[2] || "1", 10);
+        map[el] = (map[el] || 0) + count;
+      }
+      return map;
+    }
+    function multiplyMap(map, coef) {
+      const out = {};
+      for (const k of Object.keys(map)) out[k] = map[k] * coef;
+      return out;
+    }
+    function addMaps(a, b, sign) {
+      const out = { ...a };
+      for (const k of Object.keys(b)) out[k] = (out[k] || 0) + sign * b[k];
+      return out;
+    }
+
+    const ECUACIONES = [
+      { id: "ferment", texto: "C6H12O6 → C2H5OH + CO2", compuestos: [
+        { lado: "R", formula: "C6H12O6" }, { lado: "P", formula: "C2H5OH" }, { lado: "P", formula: "CO2" }
+      ], solucion: [1, 2, 2] },
+      { id: "combustionCH4", texto: "CH4 + O2 → CO2 + H2O", compuestos: [
+        { lado: "R", formula: "CH4" }, { lado: "R", formula: "O2" }, { lado: "P", formula: "CO2" }, { lado: "P", formula: "H2O" }
+      ], solucion: [1, 2, 1, 2] },
+      { id: "oxidacionFe", texto: "Fe + O2 → Fe2O3", compuestos: [
+        { lado: "R", formula: "Fe" }, { lado: "R", formula: "O2" }, { lado: "P", formula: "Fe2O3" }
+      ], solucion: [4, 3, 2] },
+      { id: "combPropano", texto: "C3H8 + O2 → CO2 + H2O", compuestos: [
+        { lado: "R", formula: "C3H8" }, { lado: "R", formula: "O2" }, { lado: "P", formula: "CO2" }, { lado: "P", formula: "H2O" }
+      ], solucion: [1, 5, 3, 4] },
+    ];
+
+    function isBalanced(coefs, ecuacion = ECUACIONES[0]) {
+      let balance = {};
+      ecuacion.compuestos.forEach((c, idx) => {
+        const parsed = parseFormula(c.formula);
+        const scaled = multiplyMap(parsed, coefs[idx] || 0);
+        balance = addMaps(balance, scaled, c.lado === "R" ? 1 : -1);
+      });
+      return Object.values(balance).every((v) => v === 0);
+    }
+
+    const EVAL_PREGUNTAS = [
+      { q: "¿Cuál NO es una evidencia típica de una reacción química?", opciones: ["Cambio de color", "Formación de precipitado", "Evaporación de agua pura", "Emisión de luz"], correcta: 2, pista: "La evaporación de agua es un cambio físico." },
+      { q: "La fermentación alcohólica produce principalmente…", opciones: ["CO₂ y etanol", "CO y agua", "Óxidos de hierro", "Nitrógeno y amoníaco"], correcta: 0 },
+      { q: "En la combustión completa del metano, los productos son:", opciones: ["CO₂ y H₂O", "CO y C", "H₂ y O₂", "CH₄ y CO₂"], correcta: 0 },
+      { q: "Un factor que generalmente AUMENTA la velocidad de reacción es:", opciones: ["Disminuir la temperatura", "Aumentar la concentración", "Disminuir la presión en gases", "Disminuir la superficie de contacto"], correcta: 1 },
+      { q: "El óxido férrico que se forma sobre el hierro se escribe como:", opciones: ["FeO", "Fe2O3", "Fe(OH)2", "Fe3O4"], correcta: 1 },
+      { q: "Balance: __ CH4 + __ O2 → __ CO2 + __ H2O", opciones: ["1, 2, 1, 2", "2, 2, 2, 2", "1, 1, 1, 2", "1, 3, 1, 2"], correcta: 0 },
+      { q: "Al aumentar la presión en reacciones de gases a volumen fijo, suele…", opciones: ["Disminuir la frecuencia de choques", "Aumentar la frecuencia de choques", "No cambiar nada", "Detener la reacción"], correcta: 1 },
+      { q: "Elegir la opción que describe mejor una reacción de oxidación:", opciones: ["Glucosa → etanol + CO₂", "Metano + O₂ → CO₂ + H₂O", "Fe + O₂ → Fe2O3", "Hielo → agua líquida"], correcta: 2 },
+    ];
+
+    function Slider({ label, value, min, max, step, onChange }) {
+      return (
+        <div className="mb-4">
+          <label className="block text-sm font-medium mb-1">{label}: <span className="font-mono">{value}</span></label>
+          <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} className="w-full" />
+        </div>
+      );
+    }
+
+    function Gauge({ value }) {
+      return (
+        <div className="w-full h-24 rounded-xl bg-slate-100 flex items-center p-3">
+          <div className="flex-1 h-4 bg-white rounded-full border border-slate-200 overflow-hidden">
+            <div className="h-full" style={{ width: `${Math.min(100, Math.max(0, value))}%`, background: `linear-gradient(90deg, rgba(16,185,129,1) 0%, rgba(59,130,246,1) 100%)` }} />
+          </div>
+          <div className="ml-3 font-mono text-sm w-16 text-right">{value}</div>
+        </div>
+      );
+    }
+
+    function Burbujeo({ active }) {
+      return (
+        <div className="relative h-36 w-full rounded-xl bg-gradient-to-b from-sky-100 to-sky-200 overflow-hidden">
+          {[...Array(14)].map((_, i) => (
+            <span
+              key={i}
+              className="absolute bottom-[-20px] w-3 h-3 bg-white/70 rounded-full animate-[float_3s_linear_infinite]"
+              style={{ left: `${(i * 7) % 100}%`, animationDelay: `${(i % 5) * 0.4}s`, opacity: active ? 1 : 0.15 }}
+            />
+          ))}
+          <style>{`
+            @keyframes float { 0% { transform: translateY(0); } 100% { transform: translateY(-140px); } }
+          `}</style>
+        </div>
+      );
+    }
+
+    function Simulador({ rate, temp, moles, volumen, presion, setTemp, setMoles, setVolumen, setPresion }) {
+      return (
+        <div className="border rounded-xl p-4 bg-slate-50">
+          <h4 className="font-medium mb-2">Simulador de factores</h4>
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div>Temp: <span className="font-mono">{temp}°C</span></div>
+            <div>Moles: <span className="font-mono">{moles}</span></div>
+            <div>Volumen: <span className="font-mono">{volumen} L</span></div>
+            <div>Presión: <span className="font-mono">{presion} atm</span></div>
+          </div>
+          <Gauge value={rate} />
+          <div className="grid grid-cols-2 gap-2 mt-3">
+            <button onClick={() => setTemp(Math.min(100, temp + 10))} className="px-2 py-1 rounded-lg bg-emerald-600 text-white text-sm">+10°C</button>
+            <button onClick={() => setTemp(Math.max(0, temp - 10))} className="px-2 py-1 rounded-lg bg-white border text-sm">-10°C</button>
+            <button onClick={() => setMoles(Math.min(2, Math.round((moles + 0.1) * 10) / 10))} className="px-2 py-1 rounded-lg bg-emerald-600 text-white text-sm">+0,1 mol</button>
+            <button onClick={() => setMoles(Math.max(0.1, Math.round((moles - 0.1) * 10) / 10))} className="px-2 py-1 rounded-lg bg-white border text-sm">-0,1 mol</button>
+            <button onClick={() => setVolumen(Math.max(0.1, Math.round((volumen - 0.1) * 10) / 10))} className="px-2 py-1 rounded-lg bg-emerald-600 text-white text-sm">-0,1 L</button>
+            <button onClick={() => setVolumen(Math.min(5, Math.round((volumen + 0.1) * 10) / 10))} className="px-2 py-1 rounded-lg bg-white border text-sm">+0,1 L</button>
+            <button onClick={() => setPresion(Math.min(2, Math.round((presion + 0.1) * 10) / 10))} className="px-2 py-1 rounded-lg bg-emerald-600 text-white text-sm">+0,1 atm</button>
+            <button onClick={() => setPresion(Math.max(0.5, Math.round((presion - 0.1) * 10) / 10))} className="px-2 py-1 rounded-lg bg-white border text-sm">-0,1 atm</button>
+          </div>
+          <p className="text-xs text-slate-500 mt-2">Hipótesis: al aumentar la concentración y la temperatura, la velocidad tiende a subir.</p>
+        </div>
+      );
+    }
+
+    function App() {
+      const [tab, setTab] = useLocal("oa17_tab", "inicio");
+
+      const [temp, setTemp] = useLocal("oa17_temp", 25);
+      const [moles, setMoles] = useLocal("oa17_moles", 0.5);
+      const [volumen, setVolumen] = useLocal("oa17_volumen", 1);
+      const [presion, setPresion] = useLocal("oa17_presion", 1);
+      const rate = useMemo(() => rateFromConditions({ temperaturaC: temp, moles, volumenL: volumen, presionAtm: presion }), [temp, moles, volumen, presion]);
+
+      const [evidSel, setEvidSel] = useLocal("oa17_evid", {});
+      const evidScore = useMemo(() => {
+        let s = 0;
+        for (const p of EVIDENCIAS_QUIZ) {
+          const sel = new Set(evidSel[p.id] || []);
+          const corr = new Set(p.respuestasCorrectas);
+          const ok = sel.size === corr.size && Array.from(sel).every((x) => corr.has(x));
+          if (ok) s++;
+        }
+        return s;
+      }, [evidSel]);
+
+      const [coef, setCoef] = useLocal("oa17_coef", {});
+
+      const [ans, setAns] = useLocal("oa17_eval", Array(EVAL_PREGUNTAS.length).fill(-1));
+      const aciertos = ans.filter((a, i) => a === EVAL_PREGUNTAS[i].correcta).length;
+
+      function descargarJSON() {
+        const data = {
+          fechaISO: new Date().toISOString(),
+          evidencias: evidSel,
+          balanceo: coef,
+          simulador: { temp, moles, volumen, presion, rate },
+          evaluacion: { respuestas: ans, aciertos, total: EVAL_PREGUNTAS.length },
+        };
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "progreso_OA17.json";
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+
+      return (
+        <div className="min-h-screen">
+          <header className="sticky top-0 z-20 backdrop-blur bg-white/70 border-b border-slate-200">
+            <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-500 flex items-center justify-center text-white font-bold">Q</div>
+              <div>
+                <h1 className="text-xl md:text-2xl font-bold">OA17 Química 1° Medio · Reacciones en la vida diaria</h1>
+                <p className="text-xs md:text-sm text-slate-600">Fermentación · Combustión · Oxidación · Evidencias · Factores · Ecuaciones · Impactos</p>
+              </div>
+            </div>
+            <nav className="max-w-6xl mx-auto px-2 pb-2">
+              <div className="flex flex-wrap gap-2">
+                {[ ["inicio","Inicio"], ["explora","Explora"], ["evidencias","Evidencias"], ["factores","Factores"], ["ecuaciones","Ecuaciones"], ["impacto","Impacto"], ["evaluacion","Evaluación"], ["docente","Docente"] ].map(([id,label]) => (
+                  <button key={id} onClick={() => setTab(id)} className={classNames("px-3 py-1.5 rounded-full text-sm border transition", tab===id?"bg-emerald-600 text-white border-emerald-600 shadow":"bg-white text-slate-700 hover:bg-slate-50 border-slate-300")}>{label}</button>
+                ))}
+              </div>
+            </nav>
+          </header>
+
+          <main className="max-w-6xl mx-auto px-4 py-6">
+            {tab === "inicio" && (
+              <section className="grid md:grid-cols-2 gap-6 items-start">
+                <div className="bg-white rounded-2xl shadow p-5">
+                  <h2 className="text-lg font-semibold mb-2">Objetivo de Aprendizaje (OA17)</h2>
+                  <p className="text-slate-700 leading-relaxed">{OA17_TEXT}</p>
+                  <div className="mt-4 p-3 rounded-xl bg-emerald-50 text-emerald-900 text-sm">
+                    <strong>Meta de esta app:</strong> comprender y explicar <em>con evidencias</em> 3 reacciones cotidianas, manipular variables que afectan su velocidad, representar ecuaciones balanceadas y reflexionar sobre su impacto.
+                  </div>
+                </div>
+                <div className="bg-white rounded-2xl shadow p-5">
+                  <h3 className="font-semibold mb-3">Ruta sugerida de aprendizaje</h3>
+                  <ol className="space-y-2 text-sm list-decimal list-inside">
+                    <li>Revisa <strong>Explora</strong>: conceptos clave y ejemplos reales.</li>
+                    <li>Resuelve <strong>Evidencias</strong>: ¿cómo sabemos que hay reacción?</li>
+                    <li>Juega con los <strong>Factores</strong>: ajusta temperatura, cantidad, volumen y presión.</li>
+                    <li>Practica <strong>Ecuaciones</strong>: ingresa coeficientes para balancear.</li>
+                    <li>Analiza <strong>Impacto</strong> y medidas de mitigación.</li>
+                    <li>Rinde la <strong>Evaluación</strong> y exporta tu progreso.</li>
+                  </ol>
+                  <div className="mt-4 text-sm text-slate-600">
+                    <p className="mb-1">Tu avance se guarda automáticamente en este navegador.</p>
+                    <button onClick={() => { localStorage.clear(); location.reload(); }} className="mt-2 text-rose-700 underline">Borrar progreso</button>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {tab === "explora" && (
+              <section className="grid md:grid-cols-3 gap-6">
+                {REACCIONES.map((r) => (
+                  <article key={r.id} className="bg-white rounded-2xl shadow p-5 flex flex-col">
+                    <h3 className="font-semibold text-lg mb-1">{r.titulo}</h3>
+                    <p className="text-sm text-slate-700 mb-3">{r.explicacion}</p>
+                    <div className="text-xs px-3 py-1.5 rounded-full bg-slate-100 inline-block mb-3">Ecuación: {r.ecuacion}</div>
+                    <div className="text-sm">
+                      <p className="font-medium">Evidencias típicas</p>
+                      <ul className="list-disc list-inside text-slate-700 mb-3">
+                        {r.evidencias.map((e) => (<li key={e}>{e}</li>))}
+                      </ul>
+                      <p className="font-medium">Seguridad</p>
+                      <ul className="list-disc list-inside text-slate-700 mb-3">
+                        {r.seguridad.map((e) => (<li key={e}>{e}</li>))}
+                      </ul>
+                      <p className="font-medium">Impacto</p>
+                      <ul className="list-disc list-inside text-slate-700">
+                        {r.impacto.map((e) => (<li key={e}>{e}</li>))}
+                      </ul>
+                    </div>
+                    <div className="mt-auto pt-4">
+                      <Simulador rate={rate} temp={temp} moles={moles} volumen={volumen} presion={presion} setTemp={setTemp} setMoles={setMoles} setVolumen={setVolumen} setPresion={setPresion} />
+                    </div>
+                  </article>
+                ))}
+              </section>
+            )}
+
+            {tab === "evidencias" && (
+              <section className="space-y-4">
+                <h3 className="text-lg font-semibold">¿Qué evidencia observas?</h3>
+                {EVIDENCIAS_QUIZ.map((p) => (
+                  <div key={p.id} className="bg-white rounded-2xl shadow p-5">
+                    <p className="font-medium mb-2">{p.id}. {p.escenario}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {p.opciones.map((op) => {
+                        const checked = (evidSel[p.id] || []).includes(op);
+                        return (
+                          <label key={op} className={classNames("px-3 py-1.5 rounded-full border cursor-pointer text-sm", checked?"bg-emerald-600 text-white border-emerald-600":"bg-white border-slate-300 hover:bg-slate-50")}> 
+                            <input type="checkbox" className="hidden" checked={checked} onChange={() => {
+                              setEvidSel({
+                                ...evidSel,
+                                [p.id]: checked ? (evidSel[p.id] || []).filter((x) => x !== op) : [ ...(evidSel[p.id] || []), op ],
+                              });
+                            }} />
+                            {op}
+                          </label>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-3 text-sm">
+                      {(() => {
+                        const sel = new Set(evidSel[p.id] || []);
+                        const corr = new Set(p.respuestasCorrectas);
+                        const ok = sel.size > 0 && sel.size === corr.size && Array.from(sel).every((x) => corr.has(x));
+                        return (
+                          <span className={classNames("px-2 py-1 rounded", ok?"bg-emerald-100 text-emerald-800":"bg-slate-100 text-slate-700")}>{ok?"¡Correcto!":"Selecciona todas las evidencias que correspondan."}</span>
+                        );
+                      })()}
+                    </div>
+                  </div>
+                ))}
+                <div className="text-sm text-slate-700">Puntaje: <strong>{evidScore}/{EVIDENCIAS_QUIZ.length}</strong></div>
+              </section>
+            )}
+
+            {tab === "factores" && (
+              <section className="grid md:grid-cols-2 gap-6">
+                <div className="bg-white rounded-2xl shadow p-5">
+                  <h3 className="font-semibold mb-2">Ajusta las variables</h3>
+                  <Slider label="Temperatura (°C)" value={temp} min={0} max={100} step={1} onChange={setTemp} />
+                  <Slider label="Cantidad (moles)" value={moles} min={0.1} max={2} step={0.1} onChange={setMoles} />
+                  <Slider label="Volumen (L)" value={volumen} min={0.1} max={5} step={0.1} onChange={setVolumen} />
+                  <Slider label="Presión (atm)" value={presion} min={0.5} max={2} step={0.1} onChange={setPresion} />
+                  <p className="text-xs text-slate-500 mt-3">Este modelo es cualitativo: muestra tendencias esperadas (no valores reales).</p>
+                </div>
+                <div className="bg-white rounded-2xl shadow p-5 flex flex-col justify-between">
+                  <div>
+                    <h3 className="font-semibold mb-2">Velocidad estimada</h3>
+                    <Gauge value={rate} />
+                  </div>
+                  <div className="mt-6">
+                    <h4 className="font-medium mb-2">Visualización</h4>
+                    <Burbujeo active={rate > 30} />
+                    <p className="text-xs text-slate-500 mt-2">Si la velocidad crece, verás más burbujas (producción de gas) como evidencia.</p>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {tab === "ecuaciones" && (
+              <section className="space-y-4">
+                <h3 className="text-lg font-semibold">Balanceo de ecuaciones químicas</h3>
+                {ECUACIONES.map((eq) => {
+                  const valores = (coef[eq.id] || Array(eq.compuestos.length).fill(0));
+                  const balanced = valores.every((v) => v > 0) && isBalanced(valores, eq);
+                  return (
+                    <div key={eq.id} className="bg-white rounded-2xl shadow p-5">
+                      <p className="mb-3 font-medium">{eq.texto}</p>
+                      <div className="flex flex-wrap gap-2 items-center">
+                        {eq.compuestos.map((c, i) => (
+                          <div key={i} className="flex items-center gap-1">
+                            <input type="number" min={0} value={valores[i] || 0} onChange={(e) => {
+                              const next = [...valores];
+                              next[i] = Number(e.target.value);
+                              setCoef({ ...coef, [eq.id]: next });
+                            }} className="w-16 px-2 py-1 border rounded-lg" />
+                            <span className="text-sm text-slate-700">{c.formula}</span>
+                            {i < eq.compuestos.length - 1 && (
+                              <span className="mx-1 text-slate-400">{eq.compuestos[i + 1].lado === "P" && c.lado === "R" ? "→" : "+"}</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-3 text-sm">
+                        {balanced ? (
+                          <span className="px-2 py-1 rounded bg-emerald-100 text-emerald-800">¡Ecuación balanceada correctamente!</span>
+                        ) : (
+                          <span className="px-2 py-1 rounded bg-slate-100 text-slate-700">Ingresa coeficientes enteros positivos y verifica el balance.</span>
+                        )}
+                        <button onClick={() => setCoef({ ...coef, [eq.id]: eq.solucion })} className="ml-3 text-emerald-700 underline">Ver solución</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </section>
+            )}
+
+            {tab === "impacto" && (
+              <section className="grid md:grid-cols-2 gap-6">
+                <div className="bg-white rounded-2xl shadow p-5">
+                  <h3 className="font-semibold mb-2">Impacto y medidas</h3>
+                  <p className="text-sm text-slate-700 mb-4">Selecciona una reacción y revisa sus posibles impactos y acciones de mitigación.</p>
+                  {REACCIONES.map((r) => (
+                    <details key={r.id} className="group border rounded-xl p-4 mb-3 bg-slate-50">
+                      <summary className="cursor-pointer font-medium">{r.titulo}</summary>
+                      <div className="mt-2 text-sm text-slate-700">
+                        <p className="font-medium mt-1">Impactos</p>
+                        <ul className="list-disc list-inside">
+                          {r.impacto.map((x) => (<li key={x}>{x}</li>))}
+                        </ul>
+                        <p className="font-medium mt-3">Medidas</p>
+                        <ul className="list-disc list-inside">
+                          {r.seguridad.map((x) => (<li key={x}>{x}</li>))}
+                        </ul>
+                      </div>
+                    </details>
+                  ))}
+                </div>
+                <div className="bg-white rounded-2xl shadow p-5">
+                  <h3 className="font-semibold mb-2">Reflexión</h3>
+                  <p className="text-sm text-slate-700">Responde: ¿qué evidencia observarías y qué medidas aplicarías en el colegio para minimizar impactos?</p>
+                  <textarea className="mt-3 w-full h-56 border rounded-xl p-3" placeholder="Escribe aquí tu reflexión (queda en tu navegador)."></textarea>
+                  <p className="text-xs text-slate-500 mt-2">Sugerencia docente: usar esta reflexión como parte de una evaluación formativa.</p>
+                </div>
+              </section>
+            )}
+
+            {tab === "evaluacion" && (
+              <section className="space-y-4">
+                <h3 className="text-lg font-semibold">Evaluación sumativa rápida</h3>
+                {EVAL_PREGUNTAS.map((p, i) => (
+                  <div key={i} className="bg-white rounded-2xl shadow p-5">
+                    <p className="font-medium mb-2">{i + 1}. {p.q}</p>
+                    <div className="grid sm:grid-cols-2 gap-2">
+                      {p.opciones.map((op, j) => (
+                        <label key={j} className={classNames("px-3 py-2 rounded-lg border cursor-pointer text-sm", ans[i]===j?"bg-emerald-600 text-white border-emerald-600":"bg-white border-slate-300 hover:bg-slate-50")}> 
+                          <input type="radio" name={`q${i}`} className="hidden" onChange={() => setAns(Object.assign([...ans], { [i]: j }))} />
+                          {op}
+                        </label>
+                      ))}
+                    </div>
+                    {ans[i] !== -1 && (
+                      <div className="mt-2 text-sm">
+                        {ans[i] === p.correcta ? (
+                          <span className="px-2 py-1 rounded bg-emerald-100 text-emerald-800">¡Correcto!</span>
+                        ) : (
+                          <span className="px-2 py-1 rounded bg-rose-100 text-rose-800">Incorrecto.</span>
+                        )}
+                        {p.pista && ans[i] !== p.correcta && (
+                          <span className="ml-2 text-slate-600">Pista: {p.pista}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                <div className="bg-white rounded-2xl shadow p-5 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-slate-700">Resultado: <strong>{aciertos} / {EVAL_PREGUNTAS.length}</strong></p>
+                    <p className="text-xs text-slate-500">Puedes descargar tu progreso como evidencia.</p>
+                  </div>
+                  <button onClick={descargarJSON} className="px-3 py-2 rounded-lg bg-emerald-600 text-white">Descargar progreso</button>
+                </div>
+              </section>
+            )}
+
+            {tab === "docente" && (
+              <section className="grid md:grid-cols-2 gap-6">
+                <div className="bg-white rounded-2xl shadow p-5">
+                  <h3 className="font-semibold mb-2">Secuencia didáctica (45–90 min)</h3>
+                  <ol className="list-decimal list-inside text-sm space-y-1 text-slate-700">
+                    <li><strong>Activación</strong> (5 min): lluvia de ideas de reacciones cotidianas.</li>
+                    <li><strong>Explora</strong> (10–15 min): lectura guiada y preguntas orales.</li>
+                    <li><strong>Evidencias</strong> (10 min): trabajo en parejas; discutir por qué cada evidencia aplica.</li>
+                    <li><strong>Factores</strong> (10–15 min): manipular variables y explicar tendencias.</li>
+                    <li><strong>Ecuaciones</strong> (10–15 min): practicar 2–3 ecuaciones con andamiaje.</li>
+                    <li><strong>Impacto</strong> (5–10 min): acordar 2 medidas de seguridad/mitigación para el colegio.</li>
+                    <li><strong>Evaluación</strong> (10 min): cuestionario sumativo + reflexión.</li>
+                  </ol>
+                  <p className="mt-3 text-xs text-slate-500">Adaptar tiempos según contexto. Enfoque en evidencias y conexión con la vida diaria.</p>
+                </div>
+                <div className="bg-white rounded-2xl shadow p-5">
+                  <h3 className="font-semibold mb-2">Criterios de logro (rúbrica breve)</h3>
+                  <ul className="list-disc list-inside text-sm text-slate-700">
+                    <li><strong>Identifica evidencias</strong> (óptimo): reconoce ≥3 evidencias en contextos nuevos.</li>
+                    <li><strong>Explica factores</strong> (óptimo): justifica efecto de T, concentración, volumen y presión.</li>
+                    <li><strong>Balancea</strong> (óptimo): ajusta coeficientes en 3 ecuaciones sin ayuda.</li>
+                    <li><strong>Argumenta impacto</strong> (óptimo): propone ≥2 medidas realistas y seguras.</li>
+                  </ul>
+                  <div className="mt-3 text-xs text-slate-500">Consejos: promover lenguaje simbólico, conectar con tecnologías cotidianas (cocina, calefacción) y reforzar seguridad.</div>
+                </div>
+              </section>
+            )}
+          </main>
+
+          <footer className="max-w-6xl mx-auto px-4 pb-10 text-xs text-slate-500">
+            <p>Recurso alineado con OA17 de Química 1° medio. Uso educativo.</p>
+          </footer>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
